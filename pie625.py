@@ -12,6 +12,7 @@ import time
 
 TANGO_ATTR = 'TangoAttribute'
 TANGO_ON_TARGET = 'TangoOnTarget'
+TANGO_LIMIT = 'Limit'
 FORMULA_READ = 'FormulaRead'
 FORMULA_WRITE = 'FormulaWrite'
 TANGO_ATTR_ENC = 'TangoAttributeEncoder'
@@ -92,7 +93,7 @@ class PI625(MotorController):
 
     def StateOne(self, axis):
         try:
-            on_target_att = self.axisAttributes[axis]['on_target']
+            on_target_att = self.axisAttributes[axis][TANGO_ON_TARGET]
             state = State.On
             status = 'ok'
             switch_state = 0
@@ -119,7 +120,7 @@ class PI625(MotorController):
 
     def ReadOne(self, axis):
         try:
-            tau_attr = self.axisAttributes[axis]['Position']
+            tau_attr = self.axisAttributes[axis][TANGO_ATTR]
             if tau_attr is None:
                 raise Exception("attribute proxy is None")
             return tau_attr.read().value
@@ -131,14 +132,17 @@ class PI625(MotorController):
         pass
 
     def PreStartOne(self, axis, pos):
-        return not self.axisAttributes[axis][TAU_ATTR] is None
+        return not self.axisAttributes[axis][TANGO_ATTR] is None
 
     def StartOne(self, axis, pos):
-        try:
-            tau_attr = self.axisAttributes[axis]['Position']
-            tau_attr.write(pos)
-        except Exception, e:
-            self._log.error("(%d) error writing: %s" % (axis, str(e)))
+        if pos > 0 and pos <= self.axisAttributes[axis][TANGO_LIMIT]:
+            try:
+                tau_attr = self.axisAttributes[axis][TANGO_ATTR]
+                tau_attr.write(pos)
+            except Exception, e:
+                self._log.error("(%d) error writing: %s" % (axis, str(e)))
+        else:
+            raise Exception("Requested position out of limits")
 
     def StartAll(self):
         pass
@@ -162,7 +166,7 @@ class PI625(MotorController):
         try:
             self._log.debug("SetExtraAttributePar [%d] %s = %s" % (axis, name, value))
             self.axisAttributes[axis][name] = value
-            # att names: Position, on_target
+            # att names: TANGO_ON_TARGET, TANGO_ON_ATTR, TANGO_LIMIT
             try:
                 self.axisAttributes[axis][name] = AttributeProxy(value)
             except Exception, e:
