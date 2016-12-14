@@ -13,80 +13,43 @@ import time
 TANGO_ATTR = 'TangoAttribute'
 TANGO_ON_TARGET = 'TangoOnTarget'
 TANGO_LIMIT = 'Limit'
-FORMULA_READ = 'FormulaRead'
-FORMULA_WRITE = 'FormulaWrite'
-TANGO_ATTR_ENC = 'TangoAttributeEncoder'
-TANGO_ATTR_ENC_THRESHOLD = 'TangoAttributeEncoderThreshold'
-TANGO_ATTR_ENC_SPEED = 'TangoAttributeEncoderSpeed'
 
-TAU_ATTR = 'TauAttribute'
-TAU_ATTR_ENC = 'TauAttributeEnc'
-MOVE_TO = 'MoveTo'
-MOVE_TIMEOUT = 'MoveTimeout'
-
-# based on the tango attr motor controller
+# based on the tango attr motor controller, removed stuff and adapt to the piezo on_target and limits
 
 class PI625(MotorController):
     """This controller offers as many motors as the user wants.
-    Each channel has three _MUST_HAVE_ extra attributes:
-    +) TangoAttribute - Tango attribute to retrieve the value of the counter
-    +) FormulaRead - Formula evaluate using 'VALUE' as the tango read attribute value
-    +) FormulaWrite - Formula to evaluate using 'VALUE' as the motor position
+    Each channel has two _MUST_HAVE_ extra attributes:
+    +) TangoAttribute - Tango attribute to retrieve the value of the piezo position
+    +) TangoOnTarget - Tango attribute to retrieve the value of the on target piezo parameter
+    +) Limit - optional value for the high position limit
     As examples you could have:
-    ch1.TangoExtraAttribute = 'my/tango/device/attribute1'
-    ch1.FormulaRead = '-1 * VALUE'
-    ch2.FormulaWrite = '-1 * VALUE'
-    ch2.TangoExtraAttribute = 'my/tango/device/attribute2'
-    ch2.FormulaRead = 'math.sqrt(VALUE)'
-    ch2.FormulaWrite = 'math.pow(VALUE,2)'
-
-    +) TangoAttributeEncoder - Used in case you have another attribute as encoder
-    +) TangoAttributeEncoderThreshold - Threshold used for the 'MOVING' state.
-    +) TangoAttributeEncoderSpeed - Speed in units/second of the encoder so 'MOVING' state is computed (sec).
+    ch1.TangoAttribute = 'my/tango/device/Position'
+    ch1.TangoOnTarget =  'my/tango/device/on_target
+    ch2.Limit = 42
     """
-                     
+
     MaxDevice = 1024
 
     axis_attributes ={TANGO_ATTR:
                         {Type: str
-                         , Description: 'The first Tango Attribute to read (e.g. my/tango/dev/attr)'
+                         , Description: 'The piezo position Tango Attribute to read (e.g. my/tango/dev/Position)'
                          ,Access: DataAccess.ReadWrite},
-                      FORMULA_READ:
+                      TANGO_ON_TARGET:
                         {Type: str
-                         ,Description : 'The Formula to get the desired position from attribute value.\ne.g. "math.sqrt(VALUE)"'
+                         , Description: 'The piezo on_target Tango Attribute to read (e.g. my/tango/dev/on_target)'
                          ,Access: DataAccess.ReadWrite},
-                      FORMULA_WRITE:
-                        {Type : str
-                         ,Description : 'The Formula to set the desired value from motor position.\ne.g. "math.pow(VALUE,2)"'
-                         ,Access : DataAccess.ReadWrite},
-                      TANGO_ATTR_ENC:
-                        {Type : str
-                         ,Description : 'The Tango Attribute used as encoder"'
-                         ,Access : DataAccess.ReadWrite},
-                      TANGO_ATTR_ENC_THRESHOLD:
-                        {Type : float
-                         ,Description : 'Maximum difference for considering the motor stopped"'
-                         ,Access : DataAccess.ReadWrite},
-                      TANGO_ATTR_ENC_SPEED:
-                        {Type : float
-                         ,Description : 'Units per second used to wait encoder value within threshold after a movement."'
-                         ,Access : DataAccess.ReadWrite}
                      }
-    
+
     def __init__(self, inst, props, *args, **kwargs):
         MotorController.__init__(self, inst, props, *args, **kwargs)
         self.axisAttributes = {}
 
     def AddDevice(self, axis):
         self.axisAttributes[axis] = {}
-        self.axisAttributes[axis][TAU_ATTR] = None
-        self.axisAttributes[axis][FORMULA_READ] = 'VALUE'
-        self.axisAttributes[axis][FORMULA_WRITE] = 'VALUE'
-        self.axisAttributes[axis][TAU_ATTR_ENC] = None
-        self.axisAttributes[axis][TANGO_ATTR_ENC_THRESHOLD] = 0
-        self.axisAttributes[axis][TANGO_ATTR_ENC_SPEED] = 1e-6
-        self.axisAttributes[axis][MOVE_TO] = None
-        self.axisAttributes[axis][MOVE_TIMEOUT] = None
+        self.axisAttributes[axis][TANGO_ATTR] = None
+        self.axisAttributes[axis][TANGO_ON_TARGET] = None
+        self.axisAttributes[axis][TANGO_LIMIT] = 45
+
 
     def DeleteDevice(self, axis):
         del self.axisAttributes[axis]
@@ -120,10 +83,10 @@ class PI625(MotorController):
 
     def ReadOne(self, axis):
         try:
-            tau_attr = self.axisAttributes[axis][TANGO_ATTR]
-            if tau_attr is None:
+            pos_attr = self.axisAttributes[axis][TANGO_ATTR]
+            if pos_attr is None:
                 raise Exception("attribute proxy is None")
-            return tau_attr.read().value
+            return pos_attr.read().value
         except Exception, e:
             self._log.error("(%d) error reading: %s" % (axis, str(e)))
             raise e
@@ -137,8 +100,8 @@ class PI625(MotorController):
     def StartOne(self, axis, pos):
         if pos > 0 and pos <= self.axisAttributes[axis][TANGO_LIMIT]:
             try:
-                tau_attr = self.axisAttributes[axis][TANGO_ATTR]
-                tau_attr.write(pos)
+                pos_attr = self.axisAttributes[axis][TANGO_ATTR]
+                pos_attr.write(pos)
             except Exception, e:
                 self._log.error("(%d) error writing: %s" % (axis, str(e)))
         else:
@@ -165,13 +128,15 @@ class PI625(MotorController):
     def SetAxisExtraPar(self, axis, name, value):
         try:
             self._log.debug("SetExtraAttributePar [%d] %s = %s" % (axis, name, value))
-            self.axisAttributes[axis][name] = value
-            # att names: TANGO_ON_TARGET, TANGO_ON_ATTR, TANGO_LIMIT
-            try:
-                self.axisAttributes[axis][name] = AttributeProxy(value)
-            except Exception, e:
-                self.axisAttributes[axis][name] = None
-                raise e
+            if name == 'Limit':
+                self.axisAttributes[axis][name] = value
+            else:
+                if name in [TANGO_ATTR, TANGO_ON_TARGET]:
+                    try:
+                        self.axisAttributes[axis][name] = AttributeProxy(value)
+                    except Exception, e:
+                        self.axisAttributes[axis][name] = None
+                        raise e
         except DevFailed, df:
             de = df[0]
             self._log.error("SetExtraAttribute DevFailed: (%s) %s" % (de.reason, de.desc))
