@@ -1,5 +1,5 @@
 ###############################################################################
-##     Energy and wavelength controllers for Biomax. 
+##     Energy and wavelength controllers for Biomax.
 ##
 ##     Copyright (C) 2015  MAX IV Laboratory, Lund Sweden.
 ##
@@ -31,8 +31,8 @@ import numpy as np
 
 
 # coefficients of the Al/Ti polynomial model obtained by least squares
-# minimization between experimentally determined and fitted attenuation 
-# lenghts (in um) as a function of photon energy (in keV) 
+# minimization between experimentally determined and fitted attenuation
+# lenghts (in um) as a function of photon energy (in keV)
 Al_coeff = [ 2.70033918627e-07, -2.98687890398e-05, \
             0.00123604226164, -0.0258445478508, \
             0.443366527092, -1.88717819273, \
@@ -78,7 +78,7 @@ class bcu_wheel(object):
         self.angles = [float(a) for a in range(0, 360, 36)]
         self.att_l = np.polyval(self.model, self.energy)
         self.transmission = np.exp(-self.lengths/self.att_l)
-    
+
     def set_position(self, new_position):
         '''
         new_position - an integer between 0 and 9
@@ -86,7 +86,7 @@ class bcu_wheel(object):
         assert type(new_position) == int, 'wrong input type. position must be an int'
         assert new_position <= 9 and new_position >= 0, 'new position out of range'
         self.position = new_position
-        
+
     def set_energy(self, new_energy):
         '''
         updates the value of the energy, recalculates the att. length and the
@@ -96,17 +96,17 @@ class bcu_wheel(object):
         self.energy = new_energy
         self.att_l = np.polyval(self.model, self.energy)
         self.transmission = np.exp(-self.lengths/self.att_l)
-    
+
     def get_position(self):
         return self.position
-    
+
     def get_angle(self):
         return self.angles[self.position]
-    
+
     def get_transmission(self):
         return self.transmission[self.position]
-        
-    
+
+
 
 class Transmission(PseudoMotorController):
     """
@@ -134,33 +134,38 @@ class Transmission(PseudoMotorController):
         self.bcu_att2_wheel = bcu_wheel(bcu_att2_lengths, Ti_model, E)
         # bcu_att3: Al
         self.bcu_att3_wheel = bcu_wheel(bcu_att3_lengths, Al_model, E)
-
+    
+    def set_all_positins(self, p1, p2, p3):
+        '''
+        sets all the three wheels to positions p1, p2, and p3
+        '''
+        self.bcu_att1_wheel.set_position(p1)
+        self.bcu_att2_wheel.set_position(p2)
+        self.bcu_att3_wheel.set_position(p3)
+        
+    def get_tot_transmission(self):
+        '''
+        gets the total combined transmission for the given wheel configuration
+        and energy value
+        '''
+        tot_trans = self.bcu_att1_wheel.get_transmission() * \
+                    self.bcu_att2_wheel.get_transmission() * \
+                    self.bcu_att3_wheel.get_transmission() * 100.0
+        return tot_trans
+        
     def set_transmission(self, transmission, E):
         '''
         sets the transmission for the specified E
         transmission - a float (transmission in %)
         E - a float (photon energy in keV)
-        
+
         returns a tuple of the list of the 3 bcu_att wheel positions (in degrees)
         and the true value of the transmission (in %):
         ([bcu_att1, bcu_att2, bcu_att3], act_trans)
-        '''  
+        '''
         # a brute force algorithm for finding the wheel combination that best matches
         # the desired transmission for the given X-ray energy
-        def set_all(p1, p2, p3):
-            '''
-            sets all the 3 wheels to positions and returns the total combined transmission
-            p1, p2, p3 - 3 ints [0, 9], specifying the positions of the 3 wheels
-            '''
-            self.bcu_att1_wheel.set_position(p1)
-            self.bcu_att2_wheel.set_position(p2)
-            self.bcu_att3_wheel.set_position(p3)
-            tot_trans = self.bcu_att1_wheel.get_transmission() * \
-                        self.bcu_att2_wheel.get_transmission() * \
-                        self.bcu_att3_wheel.get_transmission() * 100.0
-            return tot_trans
-
-        # the starting positions of all 3 wheels are  0                    
+        # the starting positions of all 3 wheels are  0
         pos = [0, 0, 0]
         best_trans = 100.0
         # test all wheel position combinations and pick the best one
@@ -169,17 +174,19 @@ class Transmission(PseudoMotorController):
                 for p3 in range(10):
                     # set the wheels to the desired positions and
                     # calculate the total transmission
-                    tot_trans = set_all(p1, p2, p3)
+                    self.set_all_positins(p1, p2, p3)
+                    tot_trans = self.get_tot_transmission()
                     if abs(transmission - tot_trans) < abs(transmission - best_trans):
                         best_trans = tot_trans
                         pos = [p1, p2, p3]
 
         # set the wheels to the optimal positions and get the value of the
         # actual total transmission and the angles of the 3 wheels
-        actual_trans = set_all(pos[0], pos[1], pos[2])
+        self.set_all_positins(pos[0], pos[1], pos[2])
+        actual_trans = self.get_tot_transmission()
         angles = (self.bcu_att1_wheel.get_angle(), self.bcu_att2_wheel.get_angle(), self.bcu_att3_wheel.get_angle())
-        return (angles, actual_trans)                
-                
+        return (angles, actual_trans)
+
     def CalcPseudo(self, index, physicals, curr_pseudo_pos):
         return self.CalcAllPseudo(physicals, curr_pseudo_pos)[index - 1]
 
@@ -205,8 +212,32 @@ class Transmission(PseudoMotorController):
     def CalcAllPseudo(self, physicals, curr_pseudo_pos):
         bcu_att1, bcu_att2, bcu_att3 = physicals
         current_energy = self.energy_attr.read().value
+        
+        # make sure the energy setting of the wheels is correct and if not
+        # update this parameter
+        if self.bcu_att1_wheel.energy != current_energy:
+            self.bcu_att1_wheel.set_energy(current_energy)
+            self.bcu_att2_wheel.set_energy(current_energy)
+            self.bcu_att3_wheel.set_energy(current_energy)
+        
+        # get the wheel positions from the motor angle values (round to the closest 36 degree increment)
+        # then set the bcu wheels to those positions and return the total transmission for the whole
+        # configuration and energy value
+        def calc_pos(motor_angle):
+            '''
+            get the closest position for the given motor angle value
+            '''
+            if motor_angle > 342:
+                position = 0
+            elif motor_angle % 36 > 18:
+                position = math.ceil(motor_angle / 36)
+            else:
+                position = math.floor(motor_angle / 36)
+            return position
 
-        # xxxx
-
+        # get all the wheel positions and set the wheels
+        pos1, pos2, pos3 = calc_pos(bcu_att1), calc_pos(bcu_att2), calc_pos(bcu_att3)
+        self.set_all_positins(pos1, pos2, pos3)
+        transmission = self.get_tot_transmission()
         return (transmission,)
 
