@@ -135,7 +135,7 @@ class Transmission(PseudoMotorController):
         # bcu_att3: Al
         self.bcu_att3_wheel = bcu_wheel(bcu_att3_lengths, Al_model, E)
     
-    def set_all_positins(self, p1, p2, p3):
+    def set_all_positions(self, p1, p2, p3):
         '''
         sets all the three wheels to positions p1, p2, and p3
         '''
@@ -159,9 +159,9 @@ class Transmission(PseudoMotorController):
         transmission - a float (transmission in %)
         E - a float (photon energy in keV)
 
-        returns a tuple of the list of the 3 bcu_att wheel positions (in degrees)
+        returns a tuple of a tuple of the 3 bcu_att wheel angles (in degrees)
         and the true value of the transmission (in %):
-        ([bcu_att1, bcu_att2, bcu_att3], act_trans)
+        ((bcu_att1, bcu_att2, bcu_att3), act_trans)
         '''
         # a brute force algorithm for finding the wheel combination that best matches
         # the desired transmission for the given X-ray energy
@@ -174,7 +174,7 @@ class Transmission(PseudoMotorController):
                 for p3 in range(10):
                     # set the wheels to the desired positions and
                     # calculate the total transmission
-                    self.set_all_positins(p1, p2, p3)
+                    self.set_all_positions(p1, p2, p3)
                     tot_trans = self.get_tot_transmission()
                     if abs(transmission - tot_trans) < abs(transmission - best_trans):
                         best_trans = tot_trans
@@ -182,7 +182,7 @@ class Transmission(PseudoMotorController):
 
         # set the wheels to the optimal positions and get the value of the
         # actual total transmission and the angles of the 3 wheels
-        self.set_all_positins(pos[0], pos[1], pos[2])
+        self.set_all_positions(pos[0], pos[1], pos[2])
         actual_trans = self.get_tot_transmission()
         angles = (self.bcu_att1_wheel.get_angle(), self.bcu_att2_wheel.get_angle(), self.bcu_att3_wheel.get_angle())
         return (angles, actual_trans)
@@ -237,7 +237,7 @@ class Transmission(PseudoMotorController):
 
         # get all the wheel positions and set the wheels
         pos1, pos2, pos3 = calc_pos(bcu_att1), calc_pos(bcu_att2), calc_pos(bcu_att3)
-        self.set_all_positins(pos1, pos2, pos3)
+        self.set_all_positions(pos1, pos2, pos3)
         transmission = self.get_tot_transmission()
         return (transmission,)
 
