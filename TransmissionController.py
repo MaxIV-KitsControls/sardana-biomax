@@ -124,9 +124,16 @@ class Transmission(PseudoMotorController):
 
     def __init__(self, inst, props, *args, **kwargs):
         PseudoMotorController.__init__(self, inst, props, *args, **kwargs)
+        self.energy_attr = None
+        self.bcu_att1_wheel = None
+        self.bcu_att2_wheel = None
+        self.bcu_att3_wheel = None
 
-        self.energy_attr = AttributeProxy('b311a-o/opt/mono-per/Position')
-        E = energy_attr.read().value
+    def initialize_proxy(self):
+        '''Energy motor migth not be ready during __init__'''
+        self.energy_attr = AttributeProxy('b311a-o/opt/mono-ener/Position')
+        E = self.energy_attr.read().value / 1000  # to keV
+        E = float("{0:.3f}".format(E))
         # construct the 3 bcu_att wheels
         # bcu_att1: Al
         self.bcu_att1_wheel = bcu_wheel(bcu_att1_lengths, Al_model, E)
@@ -134,7 +141,7 @@ class Transmission(PseudoMotorController):
         self.bcu_att2_wheel = bcu_wheel(bcu_att2_lengths, Ti_model, E)
         # bcu_att3: Al
         self.bcu_att3_wheel = bcu_wheel(bcu_att3_lengths, Al_model, E)
-    
+
     def set_all_positions(self, p1, p2, p3):
         '''
         sets all the three wheels to positions p1, p2, and p3
@@ -194,9 +201,10 @@ class Transmission(PseudoMotorController):
         return self.CalcAllPhysical(pseudos, curr_physical_pos)[index - 1]
 
     def CalcAllPhysical(self, pseudos, curr_physical_pos):
-        tranmission = pseudos[0]  # [%]
+        transmission = pseudos[0]  # [%]
 
-        current_energy = self.energy_attr.read().value
+        current_energy = self.energy_attr.read().value / 1000  # to keV
+        current_energy = float("{0:.3f}".format(current_energy))
 
         # update the wheel transmission based on current energy
         if self.bcu_att1_wheel.energy != current_energy:
@@ -204,15 +212,18 @@ class Transmission(PseudoMotorController):
             self.bcu_att2_wheel.set_energy(current_energy)
             self.bcu_att3_wheel.set_energy(current_energy)
 
-        angles, actual_trans = self.set_transmission(tranmission, current_energy)
+        angles, actual_trans = self.set_transmission(transmission, current_energy)
 
         return angles  #deg
 
 
     def CalcAllPseudo(self, physicals, curr_pseudo_pos):
+        if self.energy_attr is None:
+            self.initialize_proxy()
         bcu_att1, bcu_att2, bcu_att3 = physicals
-        current_energy = self.energy_attr.read().value
-        
+        current_energy = self.energy_attr.read().value / 1000
+        current_energy = float("{0:.3f}".format(current_energy))
+        print bcu_att1, bcu_att2, bcu_att3, current_energy
         # make sure the energy setting of the wheels is correct and if not
         # update this parameter
         if self.bcu_att1_wheel.energy != current_energy:
@@ -237,7 +248,10 @@ class Transmission(PseudoMotorController):
 
         # get all the wheel positions and set the wheels
         pos1, pos2, pos3 = calc_pos(bcu_att1), calc_pos(bcu_att2), calc_pos(bcu_att3)
-        self.set_all_positions(pos1, pos2, pos3)
-        transmission = self.get_tot_transmission()
+        try:
+            self.set_all_positions(int(pos1), int(pos2), int(pos3))
+            transmission = self.get_tot_transmission()
+        except Exception as ex:
+            print ex
         return (transmission,)
 
