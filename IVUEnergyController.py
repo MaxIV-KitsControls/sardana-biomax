@@ -21,8 +21,10 @@ from sardana import State
 from sardana.pool.controller import PseudoMotorController
 from sardana.pool.controller import Type
 from sardana.pool.controller import Description
-import PyTango
+
 from numpy import interp
+import PyTango
+import json
 
 class IVUEnergy(PseudoMotorController):
     """
@@ -33,7 +35,8 @@ class IVUEnergy(PseudoMotorController):
     model = "IVU Gap"
     organization = "Max IV"
 
-    ctrl_properties = {"energy_position_table" : {"Type" : PyTango.DevVarDoubleArray, "Description" : "Energy vs Position table"}}
+    ctrl_properties = {"energy_position_table" : {"Type" : PyTango.DevVarDoubleArray, 
+                                                  "Description" : "Energy vs Position table"}}
 
     pseudo_motor_roles = ("ivu_gap_energy",)
     motor_roles = ("ivu_gap_position",)
@@ -44,7 +47,10 @@ class IVUEnergy(PseudoMotorController):
         PseudoMotorController.__init__(self, inst, props, *args, **kwargs)
         if self.energy_position_table is None:
             raise Exception("Energy vs Position table property needs to be set")
-        
+
+        # it is an string! no matter the Type...
+        self.energy_position_table = json.loads(self.energy_position_table)
+
         self.min_energy = self.energy_position_table[0][0]
         self.min_energy = self.energy_position_table[0][-1]
 
@@ -59,10 +65,8 @@ class IVUEnergy(PseudoMotorController):
 
     def CalcAllPhysical(self, pseudos, curr_physical_pos):
         ivu_gap_energy = pseudos[0]
-        self._log.info('IVU Gap as energy: %f', ivu_gap_energy)
-        self._log.info('IVU Gap as position: %f', curr_physical_pos[0])
 
-        ivu_gap_position = interp(ivu_gap_energy, energy_position_table[0], energy_position_table[1])
+        ivu_gap_position = interp(ivu_gap_energy, self.energy_position_table[0], self.energy_position_table[1])
 
         if self.min_position < ivu_gap_position < self.max_position:
             return (ivu_gap_position,)
@@ -72,6 +76,6 @@ class IVUEnergy(PseudoMotorController):
     def CalcAllPseudo(self, physicals, curr_pseudo_pos):
         ivu_gap_position = physicals[0]
         
-        ivu_gap_energy = interp(ivu_gap_position, energy_position_table[1], energy_position_table[0])
+        ivu_gap_energy = interp(ivu_gap_position, self.energy_position_table[1], self.energy_position_table[0])
 
         return (ivu_gap_energy,)
