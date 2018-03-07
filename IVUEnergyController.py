@@ -30,13 +30,32 @@ class IVUEnergy(PseudoMotorController):
     """
     Pseudo motor controller for handling gap [mm] vs energy [eV] calculation, based on
     supplied table.
+    
+    for getting the arrays form the beamline excell file:
+    import csv
+    f = open('fit_table_EnergyGap.csv', 'rU')
+    reader = csv.reader(f, delimiter=',', quotechar='\r')
+
+    x = []
+    y = []
+
+    for row in reader:
+        x.append(float(row[0]))
+        y.append(float(row[1]))
     """
+
     gender = "Insertion Devices"
     model = "IVU Gap"
     organization = "Max IV"
 
-    ctrl_properties = {"energy_position_table" : {"Type" : PyTango.DevVarDoubleArray, 
-                                                  "Description" : "Energy vs Position table"}}
+    ctrl_properties = {"energy_array" : {"Type" : str,
+                                                  "Description" : "Energy values array",
+                                                  "DefaultValue": "[5400, 19550]"
+                                        },
+                       "position_array" : {"Type" : str,
+                                                    "Description" : "Gap position values array",
+                                                    "DefaultValue": "[4.9976, 6.9786]"}
+                       }
 
     pseudo_motor_roles = ("ivu_gap_energy",)
     motor_roles = ("ivu_gap_position",)
@@ -45,17 +64,18 @@ class IVUEnergy(PseudoMotorController):
 
     def __init__(self, inst, props, *args, **kwargs):
         PseudoMotorController.__init__(self, inst, props, *args, **kwargs)
-        if self.energy_position_table is None:
+        if self.energy_array is None:
             raise Exception("Energy vs Position table property needs to be set")
 
         # it is an string! no matter the Type...
-        self.energy_position_table = json.loads(self.energy_position_table)
+        self.energy_array = json.loads(self.energy_array)
+        self.position_array = json.loads(self.position_array)
 
-        self.min_energy = self.energy_position_table[0][0]
-        self.min_energy = self.energy_position_table[0][-1]
-
-        self.min_position = self.energy_position_table[1][0]
-        self.max_position = self.energy_position_table[1][-1]
+        self.min_energy = self.energy_array[0]
+        self.max_energy = self.energy_array[-1]
+        self.current_energy = 0.0
+        self.min_position = min(self.position_array)
+        self.max_position = max(self.position_array)
 
     def CalcPseudo(self, index, physicals, curr_pseudo_pos):
         return self.CalcAllPseudo(physicals, curr_pseudo_pos)[index - 1]
@@ -65,17 +85,13 @@ class IVUEnergy(PseudoMotorController):
 
     def CalcAllPhysical(self, pseudos, curr_physical_pos):
         ivu_gap_energy = pseudos[0]
+        self.current_energy = ivu_gap_energy
+        ivu_gap_position = interp(ivu_gap_energy, self.energy_array, self.position_array)
 
-        ivu_gap_position = interp(ivu_gap_energy, self.energy_position_table[0], self.energy_position_table[1])
-
-        if self.min_position < ivu_gap_position < self.max_position:
+        if self.min_position <= ivu_gap_position <= self.max_position:
             return (ivu_gap_position,)
         else:
             raise Exception("Requested position out of limits")
 
     def CalcAllPseudo(self, physicals, curr_pseudo_pos):
-        ivu_gap_position = physicals[0]
-        
-        ivu_gap_energy = interp(ivu_gap_position, self.energy_position_table[1], self.energy_position_table[0])
-
-        return (ivu_gap_energy,)
+        return (self.current_energy,)
