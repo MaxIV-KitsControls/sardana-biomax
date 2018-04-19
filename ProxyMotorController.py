@@ -71,11 +71,12 @@ class ProxyMotorController(MotorController):
     def __init__(self, inst, props, *args, **kwargs):
         MotorController.__init__(self, inst, props, *args, **kwargs)
         self.axisAttributes = {}
+        self.interlockProxy = None
         try:
+            print self.MotorName, self.InterlockDevice
             self.motorProxy = DeviceProxy(self.MotorName)
-            print self.MotorName
-            self.interlockProxy = DeviceProxy(self.InterlockDevice)
-            print self.InterlockDevice
+            if self.InterlockDevice!="":
+                self.interlockProxy = DeviceProxy(self.InterlockDevice)
         except DevFailed, df:
             de = df[0]
             self._log.error("__init__ DevFailed: (%s) %s" % (de.reason, de.desc))
@@ -112,11 +113,12 @@ class ProxyMotorController(MotorController):
 
     def StateOne(self, axis):
         try:
-            ilockstate = self.interlockProxy.State()
-            if ilockstate in [DevState.ALARM, DevState.FAULT, DevState.UNKNOWN, DevState.INIT]:
-		state = State.Disable
-		status = 'The device is interlocked.' 
-		return (state, status, 0)
+            if self.interlockProxy is not None:
+                ilockstate = self.interlockProxy.State()
+                if ilockstate in [DevState.ALARM, DevState.FAULT, DevState.UNKNOWN, DevState.INIT]:
+                    state = State.Disable
+                    status = 'The device is interlocked.' 
+                    return (state, status, 0)
 			
             state = self.motorProxy.State()
             status = self.motorProxy.Status()
