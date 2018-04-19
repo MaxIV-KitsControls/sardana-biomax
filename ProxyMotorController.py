@@ -1,6 +1,7 @@
 from PyTango import AttrQuality
 from PyTango import DeviceProxy
 from PyTango import DevFailed
+from PyTango import DevState
 
 from sardana import State, DataAccess
 from sardana.pool.controller import MotorController
@@ -40,6 +41,11 @@ class ProxyMotorController(MotorController):
                         {Type: str, 
                          Description: 'The motor we are controlling (e.g. my/tango/dev)',
                          DefaultValue: ""
+                         },
+                        'InterlockDevice':
+                        {Type: str, 
+                         Description: 'The name of the device of which the State is checked.',
+                         DefaultValue: ""
                          }
                       }
 
@@ -68,6 +74,8 @@ class ProxyMotorController(MotorController):
         try:
             self.motorProxy = DeviceProxy(self.MotorName)
             print self.MotorName
+            self.interlockProxy = DeviceProxy(self.InterlockDevice)
+            print self.InterlockDevice
         except DevFailed, df:
             de = df[0]
             self._log.error("__init__ DevFailed: (%s) %s" % (de.reason, de.desc))
@@ -104,9 +112,14 @@ class ProxyMotorController(MotorController):
 
     def StateOne(self, axis):
         try:
-            state =  self.motorProxy.State()
+            ilockstate = self.interlockProxy.State()
+            if ilockstate in [DevState.ALARM, DevState.FAULT, DevState.UNKNOWN, DevState.INIT]:
+		state = State.Disable
+		status = 'The device is interlocked.' 
+		return (state, status, 0)
+			
+            state = self.motorProxy.State()
             status = self.motorProxy.Status()
-
             return (state, status, 0)
         except Exception, e:
             self._log.error(" (%d) error getting state: %s" % (axis, str(e)))
