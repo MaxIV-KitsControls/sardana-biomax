@@ -18,7 +18,8 @@
 ###############################################################################
 
 from sardana.pool.controller import PseudoMotorController
-
+import PyTango
+import time
 
 class EnergyUser(PseudoMotorController):
     """
@@ -46,6 +47,17 @@ class EnergyUser(PseudoMotorController):
 
     def CalcAllPhysical(self, pseudos, physicals):
         self.current_user_energy = pseudos[0]
+        
+        mono_energy = physicals[0]
+        door = PyTango.DeviceProxy('biomax/door/01')
+       	
+        if self.current_user_energy > 8000 and mono_energy < 8000:
+	    door.runmacro(['mirror_strip', 'move', 'Rh'])
+            #door.command_inout('RunMacro',['mirror_strip', 'move', 'Rh'])
+
+        elif self.current_user_energy < 8000 and mono_energy > 8000:
+	    door.runmacro(['mirror_strip', 'move', 'Si'])
+        
         mono_energy_pseudo = self.current_user_energy
         ivu_energy_pseudo = self.current_user_energy
         return (mono_energy_pseudo, ivu_energy_pseudo)
