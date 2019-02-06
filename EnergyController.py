@@ -106,12 +106,9 @@ class Energy(PseudoMotorController):
         else:
             bragg = math.degrees(math.asin(self.hc / (self.dist * mono_energy))) #*1000 to mrad
 
-        # x2per = self.off/2*math.cos(bragg)
-        # if self.update_x2per:
-        #    x2per = self.off/2*math.cos((bragg)*(math.pi/180))
-        # else:
-        #    x2per = curr_physical_pos[1]
-        x2per = curr_physical_pos[1]
+        x2per = self.off/(2*(math.cos((bragg)*(math.pi/180))))
+
+        #x2per = curr_physical_pos[1]
         return (bragg, x2per)
 
     def CalcAllPseudo(self, physicals, curr_pseudo_pos):
