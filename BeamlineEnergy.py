@@ -17,15 +17,15 @@
 # along with this program.  If not, see [http://www.gnu.org/licenses/].
 ###############################################################################
 
-from sardana.pool.controller import PseudoMotorController, Startable
+from sardana.pool.controller import PseudoMotorController
 import PyTango
 import time
 
 class BeamlineEnergy(PseudoMotorController):
     """
-    Pseudo motor controller for handling IVU energy [eV] vs  mono energy [eV], 
-    based on the pseudo-controllers for IVU energy (IVUEnergyController) and 
-    and mono energy (EnergyController).
+    Pseudo motor controller for setting  the energy of the beamline.
+    This sets the mono energy, the IVU energy,
+    and if needed switches mirror strip.
     """
 
     gender = "Insertion Devices"
@@ -62,9 +62,8 @@ class BeamlineEnergy(PseudoMotorController):
 
 class MirrorStripChooser(PseudoMotorController):
     """
-    Pseudo motor controller for handling IVU energy [eV] vs  mono energy [eV], 
-    based on the pseudo-controllers for IVU energy (IVUEnergyController) and 
-    and mono energy (EnergyController).
+    Pseudo motor controller for handling switching of mirror strip for
+    energies under and above 8000eV. 
     """
 
     gender = "Insertion Devices"
@@ -84,21 +83,7 @@ class MirrorStripChooser(PseudoMotorController):
 
     def __init__(self, inst, props, *args, **kwargs):
         PseudoMotorController.__init__(self, inst, props, *args, **kwargs)
-        self.previous_strip = ""
         self.strip = ""
-        #hfm = self.GetMotor(self,"hfm_y") 
-        #print hfm #.get_position(self)
-        #vfm = self.getMotor("vfm_x").get_position(self)
-        #if self.isclose(hfm,hfm_positions['Si']) and self.isclose(vfm,vfm_positions['Si']):
-        #    self.previous_strip = "Si"
-        #    self.strip = "Si"
-        #elif self.isclose(hfm,hfm_positions['Rh']) and self.isclose(vfm,vfm_positions['Rh']):
-        #    self.previous_strip = "Rh"
-        #    self.strip = "Rh"
-        #else:
-        #    self.previous_strip = "unknown"
-        #    self.strip = "unknown"
-        
         self.current_user_energy = 0.0
 
     def CalcPhysical(self, index, pseudos, physicals):
@@ -107,38 +92,37 @@ class MirrorStripChooser(PseudoMotorController):
     def CalcPseudo(self, index, physicals, pseudos):
         return self.CalcAllPseudo(physicals, pseudos)[index - 1]
 
-    def CalcAllPhysical(self, pseudos, physicals):
-        if not self.strip:
-            hfm = self.GetMotor("hfm_y").get_position(self)
-            print hfm
-        #print hfm #.get_position(self)
-        #vfm = self.getMotor("vfm_x").get_position(self)
-        #if self.isclose(hfm,hfm_positions['Si']) and self.isclose(vfm,vfm_positions['Si']):
-        #    self.previous_strip = "Si"
-        #    self.strip = "Si"
-        #elif self.isclose(hfm,hfm_positions['Rh']) and self.isclose(vfm,vfm_positions['Rh']):
-        #    self.previous_strip = "Rh"
-        #    self.strip = "Rh"
-        #else:
-        #    self.previous_strip = "unknown"
-        #    self.strip = "unknown"
-        self.current_user_energy = pseudos[0]
-        if self.current_user_energy > 8000:
+    def _checkStrip(self, physicals):
+        #hfm = self.GetMotor("hfm_y").get_position(self).get_value()
+        #vfm = self.GetMotor("vfm_x").get_position(self).get_value()
+        hfm = physicals[0]
+        vfm = physicals[1]
+        if self.isclose(hfm, self.hfm_positions['Si']) and self.isclose(vfm, self.vfm_positions['Si']):
+            self.strip = "Si"
+        elif self.isclose(hfm, self.hfm_positions['Rh']) and self.isclose(vfm, self.vfm_positions['Rh']):
             self.strip = "Rh"
         else:
-            self.strip = "Si"
+            self.strip = "unknown"
+
+    def CalcAllPhysical(self, pseudos, physicals):
+        self._checkStrip(physicals)
+        self.current_user_energy = pseudos[0]
+        if self.current_user_energy > 8000:
+            strip = "Rh"
+        else:
+            strip = "Si"
 
         curr_hfm_y = physicals[0]
         curr_vfm_x = physicals[1]
         curr_piezo_hfm_fpit = physicals[2]
         curr_piezo_vfm_fpit = physicals[3]
 
-        if self.strip != self.previous_strip:
+        if strip != self.strip and self.strip in ['Si', 'Rh']:
             self.power_on()
-            hfm_y_pseudo = self.hfm_positions[self.strip]
-            vfm_x_pseudo = self.vfm_positions[self.strip]
-            piezo_hfm_pseudo = curr_piezo_hfm_fpit + self.piezo_hfm_move[self.strip]
-            piezo_vfm_pseudo = curr_piezo_vfm_fpit + self.piezo_vfm_move[self.strip]
+            hfm_y_pseudo = self.hfm_positions[strip]
+            vfm_x_pseudo = self.vfm_positions[strip]
+            piezo_hfm_pseudo = curr_piezo_hfm_fpit + self.piezo_hfm_move[strip]
+            piezo_vfm_pseudo = curr_piezo_vfm_fpit + self.piezo_vfm_move[strip]
         else:
             hfm_y_pseudo = curr_hfm_y
             vfm_x_pseudo = curr_vfm_x
@@ -146,10 +130,11 @@ class MirrorStripChooser(PseudoMotorController):
             piezo_vfm_pseudo = curr_piezo_vfm_fpit
         
         self.power_on()
-        self.previous_strip = self.strip
+        self.strip = strip
         return (hfm_y_pseudo, vfm_x_pseudo, piezo_hfm_pseudo, piezo_vfm_pseudo)
 
     def CalcAllPseudo(self, physicals, pseudos):
+        self._checkStrip(physicals)
         return (self.current_user_energy,)
     
     def power_on(self):
