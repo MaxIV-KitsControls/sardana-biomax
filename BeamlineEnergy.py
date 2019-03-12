@@ -144,7 +144,30 @@ class MirrorStripChooser(PseudoMotorController):
     
     def power_on(self):
         try:
-            pass
+            hfm_y = self.GetMotor('hfm_y')
+            vfm_x = self.GetMotor('vfm_x')
+
+            motornames = vfm_x.serialize()['elements']
+            motors = [hfm_y]
+            pool = self._getPoolController().pool
+            for mot in motornames:
+                motors.append(pool.get_element_by_name(mot))
+            print motors
+            waitforpower = False
+            for mot in motors:
+                if mot.PowerOn == False:
+                    mot.PowerOn = True
+                    waitforpower = True
+            if waitforpower:
+                pass
+
+  
+            #vfm_x1.write_attribute('PowerOn', True)
+            #vfm_x2.write_attribute('PowerOn', True)
+            #wait a bit..
+            #is power on? then continue
+
+
             #self.GetMotor("hfm_y").PowerOn = 1
             #self.vfm_x1.PowerOn = 1
             #self.vfm_x2.PowerOn = 1
