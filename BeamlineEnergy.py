@@ -19,7 +19,10 @@
 
 from sardana.pool.controller import PseudoMotorController
 import PyTango
+from PyTango import AttributeProxy
 import time
+from sardana.pool.poolpseudomotor import PoolPseudoMotor
+from sardana.pool.poolmotor import PoolMotor
 
 class BeamlineEnergy(PseudoMotorController):
     """
@@ -92,7 +95,7 @@ class MirrorStripChooser(PseudoMotorController):
     def CalcPseudo(self, index, physicals, pseudos):
         return self.CalcAllPseudo(physicals, pseudos)[index - 1]
 
-    def _checkStrip(self, physicals):
+    def _check_strip(self, physicals):
         hfm = physicals[0]
         vfm = physicals[1]
         if self.isclose(hfm, self.hfm_positions['Si']) and self.isclose(vfm, self.vfm_positions['Si']):
@@ -103,7 +106,7 @@ class MirrorStripChooser(PseudoMotorController):
             self.strip = "unknown"
 
     def CalcAllPhysical(self, pseudos, physicals):
-        self._checkStrip(physicals)
+        self._check_strip(physicals)
         self.current_user_energy = pseudos[0]
         if self.current_user_energy > 8000:
             strip = "Rh"
@@ -139,46 +142,44 @@ class MirrorStripChooser(PseudoMotorController):
         return (hfm_y_pseudo, vfm_x_pseudo, piezo_hfm_pseudo, piezo_vfm_pseudo)
 
     def CalcAllPseudo(self, physicals, pseudos):
-        self._checkStrip(physicals)
+        self._check_strip(physicals)
         return (self.current_user_energy,)
     
+    def get_pool_motors(self,name):
+        motor = self.GetMotor(name)
+        motors = []
+        if isinstance(motor, PoolMotor):
+            motors.append(motor)
+        elif isinstance(motor, PoolPseudoMotor):
+            motors = motors + list(motor.get_user_elements())
+        else:
+            self._log.warning("Motor {} is of unknown type".format(name))
+        return motors
+
     def power_on(self):
-        try:
-            hfm_y = self.GetMotor('hfm_y')
-            vfm_x = self.GetMotor('vfm_x')
+        motors = []
+        motors = motors+self.get_pool_motors('hfm_y')
+        motors = motors+self.get_pool_motors('vfm_x')
+        attrs = []
+        all_on = True
+        for mot in motors:
+            try:
+                power_attr = AttributeProxy(mot.name + '/PowerOn')
+                attrs.append(power_attr)
+                if power_attr.read().value==False:
+                    power_attr.write(True)
+                    all_on=False
+            except PyTango.DevFailed as e:
+                self._log.warning("Motor {} doesn't have a PowerOn attribute".format(mot.name))
+        starttime = time.time()
+        while all_on == False:
+            if time.time()-starttime > 2:
+                raise PyTango.DevFailed("Timeout while waiting for motors to power on")
+            all_on = True
+            time.sleep(0.1)
+            for attr in attrs:
+                if attr.read().value == False:
+                    all_on = False
+            
 
-            motornames = vfm_x.serialize()['elements']
-            motors = [hfm_y]
-            pool = self._getPoolController().pool
-            for mot in motornames:
-                motors.append(pool.get_element_by_name(mot))
-            print motors
-            waitforpower = False
-            for mot in motors:
-                if mot.PowerOn == False:
-                    mot.PowerOn = True
-                    waitforpower = True
-            if waitforpower:
-                pass
-
-  
-            #vfm_x1.write_attribute('PowerOn', True)
-            #vfm_x2.write_attribute('PowerOn', True)
-            #wait a bit..
-            #is power on? then continue
-
-
-            #self.GetMotor("hfm_y").PowerOn = 1
-            #self.vfm_x1.PowerOn = 1
-            #self.vfm_x2.PowerOn = 1
-        except Exception as e:
-            print( str(e) )
-
-    #def power_off(self):
-    #    try:
-    #        self.hfm_y.PowerOn = 0
-    #        self.vfm_x1.PowerOn = 0
-    #        self.vfm_x2.PowerOn = 0
-    #    except Exception, e:
-    #        self.error(e)
 
