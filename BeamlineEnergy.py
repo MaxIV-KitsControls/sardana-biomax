@@ -1,5 +1,5 @@
 ###############################################################################
-# Mono energy and IVU energy controllers for Biomax.
+# Beamline energy and mirror strip energy controllers for Biomax.
 ##
 # Copyright (C) 2018  MAX IV Laboratory, Lund Sweden.
 ##
@@ -30,10 +30,9 @@ class BeamlineEnergy(PseudoMotorController):
     This sets the mono energy, the IVU energy,
     and if needed switches mirror strip.
     """
-
-    gender = "Insertion Devices"
-    model = "IVU Gap"
-    organization = "Max IV"
+    gender = "Energy"
+    model = "Energy"
+    organization = "MAX IV"
 
     pseudo_motor_roles = ("energy_user",)
     motor_roles = ("mono_energy", "ivu_energy", "mirrorstrip_chooser")
@@ -69,8 +68,8 @@ class MirrorStripChooser(PseudoMotorController):
     energies under and above 8000eV. 
     """
 
-    gender = "Insertion Devices"
-    model = "IVU Gap"
+    gender = "Energy"
+    model = "Mirror strip"
     organization = "Max IV"
 
     pseudo_motor_roles = ("energy_user",)
