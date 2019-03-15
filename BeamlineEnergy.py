@@ -17,7 +17,7 @@
 # along with this program.  If not, see [http://www.gnu.org/licenses/].
 ###############################################################################
 
-from sardana.pool.controller import PseudoMotorController
+from sardana.pool.controller import PseudoMotorController, Description, Type, DefaultValue 
 import PyTango
 from PyTango import AttributeProxy
 import time
@@ -75,10 +75,31 @@ class MirrorStripChooser(PseudoMotorController):
     pseudo_motor_roles = ("energy_user",)
     motor_roles = ("hfm_y", "vfm_x", "piezo_hfm_fpit", "piezo_vfm_fpit")
 
-    hfm_positions = {"Si":-1.5, "Rh":10.5}
-    vfm_positions = {"Si":3.0, "Rh":-5.0}
-    piezo_hfm_move = {"Si":4.8, "Rh":-4.8}
-    piezo_vfm_move = {"Si":-10.0, "Rh":10.0}
+    ctrl_properties = {'hfm_pos_Si': {Type:'PyTango.DevDouble',
+                                       DefaultValue: -1.5,
+                                       Description: 'HFM position for Si'},
+                       'hfm_pos_Rh': {Type:'PyTango.DevDouble',
+                                       DefaultValue: 10.5,
+                                       Description: 'HFM position for Rh'},
+                       'vfm_pos_Si': {Type:'PyTango.DevDouble',
+                                       DefaultValue: 3.0,
+                                       Description: 'VFM position for Si'},
+                       'vfm_pos_Rh': {Type:'PyTango.DevDouble',
+                                       DefaultValue: -5.0,
+                                       Description: 'VFM position for Rh'},
+                       'piezo_hfm_Si_to_Rh': {Type:'PyTango.DevDouble',
+                                       DefaultValue: -4.8,
+                                       Description: 'Distance to move Piezo HFM position from Si to Rh'},
+                       'piezo_vfm_Si_to_Rh': {Type:'PyTango.DevDouble',
+                                       DefaultValue: 10.0,
+                                       Description: 'Distance to move Piezo VFM position from Si to Rh'},
+                        }
+
+
+    #hfm_positions = {"Si":-1.5, "Rh":10.5}
+    #vfm_positions = {"Si":3.0, "Rh":-5.0}
+    #piezo_hfm_move = {"Si":4.8, "Rh":-4.8}
+    #piezo_vfm_move = {"Si":-10.0, "Rh":10.0}
 
     def isclose(self, a, b):
         return abs(a-b)<0.1
@@ -87,6 +108,11 @@ class MirrorStripChooser(PseudoMotorController):
         PseudoMotorController.__init__(self, inst, props, *args, **kwargs)
         self.strip = ""
         self.current_user_energy = 0.0
+        self.hfm_positions = {"Si":self.hfm_pos_Si, "Rh":self.hfm_pos_Rh}
+        self.vfm_positions = {"Si":self.vfm_pos_Si, "Rh":self.vfm_pos_Rh}
+        self.piezo_hfm_move = {"Si":-self.piezo_hfm_Si_to_Rh, "Rh":self.piezo_hfm_Si_to_Rh}
+        self.piezo_vfm_move = {"Si":-self.piezo_vfm_Si_to_Rh, "Rh":self.piezo_vfm_Si_to_Rh}
+
 
     def CalcPhysical(self, index, pseudos, physicals):
         return self.CalcAllPhysical(pseudos, physicals)[index - 1]
