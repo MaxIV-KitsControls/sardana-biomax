@@ -82,23 +82,29 @@ class MirrorStripChooser(PseudoMotorController):
                                        DefaultValue: 10.5,
                                        Description: 'HFM y position for Rh'},
                        'vfm_1_pos_Si': {Type:'PyTango.DevDouble',
-                                       DefaultValue: 3.0,
+                                       DefaultValue: 2.95,
                                        Description: 'VFM x1 position for Si'},
                        'vfm_1_pos_Rh': {Type:'PyTango.DevDouble',
-                                       DefaultValue: -5.0,
+                                       DefaultValue: -5.05,
                                        Description: 'VFM x1 position for Rh'},
                        'vfm_2_pos_Si': {Type:'PyTango.DevDouble',
-                                       DefaultValue: 3.0,
+                                       DefaultValue: 3.05,
                                        Description: 'VFM x2 position for Si'},
                        'vfm_2_pos_Rh': {Type:'PyTango.DevDouble',
-                                       DefaultValue: -5.0,
+                                       DefaultValue: -4.95,
                                        Description: 'VFM x2 position for Rh'},
-                       'piezo_hfm_Si_to_Rh': {Type:'PyTango.DevDouble',
-                                       DefaultValue: -4.8,
-                                       Description: 'Distance to move Piezo HFM position from Si to Rh'},
-                       'piezo_vfm_Si_to_Rh': {Type:'PyTango.DevDouble',
-                                       DefaultValue: 10.0,
-                                       Description: 'Distance to move Piezo VFM position from Si to Rh'},
+                       'piezo_hfm_Si': {Type:'PyTango.DevDouble',
+                                       DefaultValue: 21.05,
+                                       Description: 'Piezo HFM position for Si'},
+                       'piezo_hfm_Rh': {Type:'PyTango.DevDouble',
+                                       DefaultValue: 16.85,
+                                       Description: 'Piezo HFM position for Rh'},
+                       'piezo_vfm_Si': {Type:'PyTango.DevDouble',
+                                       DefaultValue: 19.2,
+                                       Description: 'Piezo VFM position for Si'},
+                       'piezo_vfm_Rh': {Type:'PyTango.DevDouble',
+                                       DefaultValue: 29.2,
+                                       Description: 'Piezo VFM position for Rh'},
                         }
 
 
@@ -117,8 +123,8 @@ class MirrorStripChooser(PseudoMotorController):
         self.hfm_positions = {"Si":self.hfm_pos_Si, "Rh":self.hfm_pos_Rh}
         self.vfm_1_positions = {"Si":self.vfm_1_pos_Si, "Rh":self.vfm_1_pos_Rh}
         self.vfm_2_positions = {"Si":self.vfm_2_pos_Si, "Rh":self.vfm_2_pos_Rh}
-        self.piezo_hfm_move = {"Si":-self.piezo_hfm_Si_to_Rh, "Rh":self.piezo_hfm_Si_to_Rh}
-        self.piezo_vfm_move = {"Si":-self.piezo_vfm_Si_to_Rh, "Rh":self.piezo_vfm_Si_to_Rh}
+        self.piezo_hfm = {"Si":self.piezo_hfm_Si, "Rh":self.piezo_hfm_Rh}
+        self.piezo_vfm = {"Si":self.piezo_vfm_Si, "Rh":self.piezo_vfm_Rh}
 
 
     def CalcPhysical(self, index, pseudos, physicals):
@@ -152,20 +158,20 @@ class MirrorStripChooser(PseudoMotorController):
         curr_piezo_hfm_fpit = physicals[3]
         curr_piezo_vfm_fpit = physicals[4]
 
-        if strip != self.strip and self.strip in ['Si', 'Rh']:
+        if strip != self.strip: # and self.strip in ['Si', 'Rh']:
             self._log.debug("Moving strip to {}.".format(strip))
             hfm_y_pseudo = self.hfm_positions[strip]
             vfm_x1_pseudo = self.vfm_1_positions[strip]
             vfm_x2_pseudo = self.vfm_2_positions[strip]
-            piezo_hfm_pseudo = curr_piezo_hfm_fpit + self.piezo_hfm_move[strip]
-            piezo_vfm_pseudo = curr_piezo_vfm_fpit + self.piezo_vfm_move[strip]
-        elif self.strip not in ['Si', 'Rh']:
-            self._log.warning("The strip mirror is not in one of the predefined start positions. Where are we?")
-            hfm_y_pseudo = curr_hfm_y
-            vfm_x1_pseudo = curr_vfm_x1
-            vfm_x2_pseudo = curr_vfm_x2
-            piezo_hfm_pseudo = curr_piezo_hfm_fpit
-            piezo_vfm_pseudo = curr_piezo_vfm_fpit
+            piezo_hfm_pseudo = self.piezo_hfm[strip]
+            piezo_vfm_pseudo = self.piezo_vfm[strip]
+        #elif self.strip not in ['Si', 'Rh']:
+        #    self._log.warning("The strip mirror is not in one of the predefined start positions. Where are we?")
+        #    hfm_y_pseudo = curr_hfm_y
+        #    vfm_x1_pseudo = curr_vfm_x1
+        #    vfm_x2_pseudo = curr_vfm_x2
+        #    piezo_hfm_pseudo = curr_piezo_hfm_fpit
+        #    piezo_vfm_pseudo = curr_piezo_vfm_fpit
         else:
             self._log.debug("No need to move the strip, staying in place.")
             hfm_y_pseudo = curr_hfm_y
