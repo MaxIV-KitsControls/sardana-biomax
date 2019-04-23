@@ -73,7 +73,7 @@ class MirrorStripChooser(PseudoMotorController):
     organization = "Max IV"
 
     pseudo_motor_roles = ("energy_user",)
-    motor_roles = ("hfm_y", "vfm_x1", "vfm_x2", "piezo_hfm_fpit", "piezo_vfm_fpit", "vfm_yaw")
+    motor_roles = ("hfm_y", "vfm_x1", "vfm_x2", "piezo_hfm_fpit", "piezo_vfm_fpit")
 
     ctrl_properties = {'hfm_pos_Si': {Type:'PyTango.DevDouble',
                                        DefaultValue: -1.5,
@@ -99,12 +99,6 @@ class MirrorStripChooser(PseudoMotorController):
                        'piezo_vfm_Si_to_Rh': {Type:'PyTango.DevDouble',
                                        DefaultValue: 10.0,
                                        Description: 'Distance to move Piezo VFM position from Si to Rh'},
-                       'vfm_yaw_Si': {Type:'PyTango.DevDouble',
-                                       DefaultValue: 0.5,
-                                       Description: 'VFM yaw position for Si'},
-                       'vfm_yaw_Rh': {Type:'PyTango.DevDouble',
-                                       DefaultValue: -0.5,
-                                       Description: 'VFM yaw position for Rh'},
                         }
 
 
@@ -123,7 +117,6 @@ class MirrorStripChooser(PseudoMotorController):
         self.hfm_positions = {"Si":self.hfm_pos_Si, "Rh":self.hfm_pos_Rh}
         self.vfm_1_positions = {"Si":self.vfm_1_pos_Si, "Rh":self.vfm_1_pos_Rh}
         self.vfm_2_positions = {"Si":self.vfm_2_pos_Si, "Rh":self.vfm_2_pos_Rh}
-        self.vfm_yaw_positions = {"Si":self.vfm_yaw_Si, "Rh":self.vfm_yaw_Rh}
         self.piezo_hfm_move = {"Si":-self.piezo_hfm_Si_to_Rh, "Rh":self.piezo_hfm_Si_to_Rh}
         self.piezo_vfm_move = {"Si":-self.piezo_vfm_Si_to_Rh, "Rh":self.piezo_vfm_Si_to_Rh}
 
@@ -158,14 +151,12 @@ class MirrorStripChooser(PseudoMotorController):
         curr_vfm_x2 = physicals[2]
         curr_piezo_hfm_fpit = physicals[3]
         curr_piezo_vfm_fpit = physicals[4]
-        curr_vfm_yaw = physicals[5]
 
         if strip != self.strip and self.strip in ['Si', 'Rh']:
             self._log.debug("Moving strip to {}.".format(strip))
             hfm_y_pseudo = self.hfm_positions[strip]
             vfm_x1_pseudo = self.vfm_1_positions[strip]
             vfm_x2_pseudo = self.vfm_2_positions[strip]
-            vfm_yaw_pseudo = self.vfm_yaw_positions[strip]
             piezo_hfm_pseudo = curr_piezo_hfm_fpit + self.piezo_hfm_move[strip]
             piezo_vfm_pseudo = curr_piezo_vfm_fpit + self.piezo_vfm_move[strip]
         elif self.strip not in ['Si', 'Rh']:
@@ -173,7 +164,6 @@ class MirrorStripChooser(PseudoMotorController):
             hfm_y_pseudo = curr_hfm_y
             vfm_x1_pseudo = curr_vfm_x1
             vfm_x2_pseudo = curr_vfm_x2
-            vfm_yaw_pseudo = curr_vfm_yaw
             piezo_hfm_pseudo = curr_piezo_hfm_fpit
             piezo_vfm_pseudo = curr_piezo_vfm_fpit
         else:
@@ -181,14 +171,13 @@ class MirrorStripChooser(PseudoMotorController):
             hfm_y_pseudo = curr_hfm_y
             vfm_x1_pseudo = curr_vfm_x1
             vfm_x2_pseudo = curr_vfm_x2
-            vfm_yaw_pseudo = curr_vfm_yaw
             piezo_hfm_pseudo = curr_piezo_hfm_fpit
             piezo_vfm_pseudo = curr_piezo_vfm_fpit
         
         self.power_on()
         self.strip = strip
         self.current_user_energy = new_energy
-        return (hfm_y_pseudo, vfm_x1_pseudo, vfm_x2_pseudo, piezo_hfm_pseudo, piezo_vfm_pseudo, vfm_yaw_pseudo)
+        return (hfm_y_pseudo, vfm_x1_pseudo, vfm_x2_pseudo, piezo_hfm_pseudo, piezo_vfm_pseudo)
 
     def CalcAllPseudo(self, physicals, pseudos):
         self._check_strip(physicals)
