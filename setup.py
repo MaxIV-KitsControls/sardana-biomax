@@ -29,7 +29,7 @@ def main():
         
     # Add your build requires in the following line.
     
-    requires == ['sphinx_rtd_theme', 'pytest', 'setuptools']
+    requires = ['sphinx_rtd_theme', 'pytest', 'setuptools']
     
 
     setup(
